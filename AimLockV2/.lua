@@ -109,40 +109,6 @@ local function aimAtTarget(target)
     Camera.CFrame = currentCameraCFrame:Lerp(newCFrame, AimSensitivity)
 end
 
--- Создаем маленькую таблицу с инструкцией справа от списка игроков
-local instructionFrame = Instance.new("Frame")
-instructionFrame.Size = UDim2.new(0, 250, 0, 230) -- Увеличиваем размер таблицы, чтобы поместилась вся инструкция
-instructionFrame.Position = UDim2.new(0, 220, 0, 10)
-instructionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-instructionFrame.Visible = true -- Сделаем видимой с самого начала
-instructionFrame.Parent = screenGui
-
-local instructionLabel = Instance.new("TextLabel")
-instructionLabel.Size = UDim2.new(1, 0, 0, 150)
-instructionLabel.Position = UDim2.new(0, 0, 0, 0)
-instructionLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-instructionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-instructionLabel.TextSize = 14
-instructionLabel.Text = "Инструкция:\n" ..
-                        "F - Наведение на 0.01 сек\n" ..
-                        "M - Скрыть/Показать обе таблицы\n" ..
-                        "N - Сбросить все цели"
-instructionLabel.TextWrapped = true
-instructionLabel.TextYAlignment = Enum.TextYAlignment.Top
-instructionLabel.Parent = instructionFrame
-
--- Подпись "Создано игроком Nano - AimLock Script"
-local authorLabel = Instance.new("TextLabel")
-authorLabel.Size = UDim2.new(1, 0, 0, 30)
-authorLabel.Position = UDim2.new(0, 0, 0.8, 0)
-authorLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-authorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-authorLabel.TextSize = 12
-authorLabel.Text = "Создано игроком Nano - AimLock Script"
-authorLabel.TextWrapped = true
-authorLabel.TextYAlignment = Enum.TextYAlignment.Top
-authorLabel.Parent = instructionFrame
-
 -- Обработка ввода пользователя
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -150,13 +116,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     -- Переключение видимости обеих таблиц
     if input.KeyCode == ToggleTableKey then
         frame.Visible = not frame.Visible
-        instructionFrame.Visible = not instructionFrame.Visible
     end
 
     -- Включение aim lock при нажатии на F
     if input.KeyCode == AimLockKey then
-        aimLockEnabled = true
-
         -- Получаем ближайшую цель из выбранных
         targetPlayer = getClosestTarget()
 
@@ -168,7 +131,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             wait(AimLockDuration)
 
             -- Отключаем aim lock после задержки
-            aimLockEnabled = false
             targetPlayer = nil
         end
     end
@@ -178,20 +140,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         selectedPlayers = {} -- Очищаем список выбранных игроков
         -- Обновляем GUI, сбрасывая подсветку кнопок
         updatePlayerList()
-    end
-end)
-
--- Цикл для обновления aim lock
-game:GetService("RunService").RenderStepped:Connect(function()
-    if aimLockEnabled then
-        if not targetPlayer then
-            -- Если нет выбранной цели, ищем ближайшую
-            targetPlayer = getClosestTarget()
-        end
-
-        if targetPlayer then
-            aimAtTarget(targetPlayer)
-        end
     end
 end)
 
