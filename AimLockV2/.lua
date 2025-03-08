@@ -6,13 +6,16 @@ local Camera = workspace.CurrentCamera
 -- Настройки
 local AimLockKey = Enum.KeyCode.F -- Клавиша для включения aim lock
 local AimSensitivity = 1 -- Скорость наведения на цель
-local AimLockDuration = 0.01 -- Продолжительность действия aim lock (в секундах)
+local AimLockDuration = 0.01 -- Продолжительность мгновенной наводки (в секундах)
 local ToggleTableKey = Enum.KeyCode.M -- Клавиша для переключения видимости обеих таблиц
 local ResetTargetsKey = Enum.KeyCode.N -- Клавиша для сброса всех выбранных целей
+local ToggleAimModeKey = Enum.KeyCode.K -- Клавиша для переключения между режимами наводки
 
-local aimLockEnabled = false
+local aimLockEnabled = false -- Флаг для мгновенной наводки
+local isContinuousAimEnabled = false -- Флаг для постепенной наводки
 local selectedPlayers = {} -- Список выбранных игроков
 local targetPlayer = nil
+local isInContinuousMode = false -- Флаг для режима "постепенной наводки"
 
 -- Создаем GUI
 local screenGui = Instance.new("ScreenGui")
@@ -21,7 +24,7 @@ screenGui.Name = "AimLockGUI"
 
 -- Основная таблица игроков
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 300)
+frame.Size = UDim2.new(0, 300, 0, 300) -- Увеличиваем размер таблицы
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.Parent = screenGui
@@ -109,6 +112,41 @@ local function aimAtTarget(target)
     Camera.CFrame = currentCameraCFrame:Lerp(newCFrame, AimSensitivity)
 end
 
+-- Создаем маленькую таблицу с инструкцией справа от списка игроков
+local instructionFrame = Instance.new("Frame")
+instructionFrame.Size = UDim2.new(0, 250, 0, 300) -- Увеличиваем размер таблицы, чтобы поместилась вся инструкция
+instructionFrame.Position = UDim2.new(0, 320, 0, 10) -- Пододвигаем вправо
+instructionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+instructionFrame.Visible = true -- Сделаем видимой с самого начала
+instructionFrame.Parent = screenGui
+
+local instructionLabel = Instance.new("TextLabel")
+instructionLabel.Size = UDim2.new(1, 0, 0, 250) -- Увеличиваем размер для инструкции
+instructionLabel.Position = UDim2.new(0, 0, 0, 0)
+instructionLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+instructionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+instructionLabel.TextSize = 14
+instructionLabel.Text = "Инструкция:\n" ..
+                        "F - Вкл/выкл аим лока (наводка на 0.01 сек)\n" ..
+                        "K - Переключить режим аим лока (постепенная или на 0.1)\n" ..
+                        "M - Скрыть или Показать обе таблицы\n" ..
+                        "N - Сбросить все выбранные цели и очистить подсветку"
+instructionLabel.TextWrapped = true
+instructionLabel.TextYAlignment = Enum.TextYAlignment.Top
+instructionLabel.Parent = instructionFrame
+
+-- Подпись "создано игроком Nano"
+local authorLabel = Instance.new("TextLabel")
+authorLabel.Size = UDim2.new(1, 0, 0, 30)
+authorLabel.Position = UDim2.new(0, 0, 0.85, 0) -- Смещаем немного вниз
+authorLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+authorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+authorLabel.TextSize = 12
+authorLabel.Text = "Создано игроком Nano"
+authorLabel.TextWrapped = true
+authorLabel.TextYAlignment = Enum.TextYAlignment.Top
+authorLabel.Parent = instructionFrame
+
 -- Обработка ввода пользователя
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -116,30 +154,61 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     -- Переключение видимости обеих таблиц
     if input.KeyCode == ToggleTableKey then
         frame.Visible = not frame.Visible
+        instructionFrame.Visible = not instructionFrame.Visible
     end
 
     -- Включение aim lock при нажатии на F
     if input.KeyCode == AimLockKey then
-        -- Получаем ближайшую цель из выбранных
-        targetPlayer = getClosestTarget()
+        if isInContinuousMode then
+            -- Для постепенной наводки
+            aimLockEnabled = not aimLockEnabled
+        else
+            -- Для мгновенной наводки
+            aimLockEnabled = true
+            targetPlayer = getClosestTarget()
 
-        -- Если цель найдена, наводим на неё
-        if targetPlayer then
-            aimAtTarget(targetPlayer)
+            -- Если цель найдена, наводим на неё
+            if targetPlayer then
+                aimAtTarget(targetPlayer)
 
-            -- Останавливаем aim lock через 0.01 секунды
-            wait(AimLockDuration)
+                -- Останавливаем aim lock через 0.01 секунды
+                wait(AimLockDuration)
 
-            -- Отключаем aim lock после задержки
-            targetPlayer = nil
+                -- Отключаем aim lock после задержки
+                aimLockEnabled = false
+                targetPlayer = nil
+            end
         end
+    end
+
+    -- Переключение между режимами aim lock при нажатии на K
+    if input.KeyCode == ToggleAimModeKey then
+        isInContinuousMode = not isInContinuousMode
+        -- Отключаем aim lock при переключении
+        aimLockEnabled = false
+        targetPlayer = nil
     end
 
     -- Сброс всех выбранных игроков при нажатии на N
     if input.KeyCode == ResetTargetsKey then
         selectedPlayers = {} -- Очищаем список выбранных игроков
+        aimLockEnabled = false -- Отключаем aim lock
+        targetPlayer = nil -- Очищаем текущую цель
         -- Обновляем GUI, сбрасывая подсветку кнопок
         updatePlayerList()
+    end
+end)
+
+-- Цикл для обновления aim lock
+game:GetService("RunService").RenderStepped:Connect(function()
+    if aimLockEnabled then
+        if not targetPlayer or not targetPlayer.Character then
+            targetPlayer = getClosestTarget()
+        end
+
+        if targetPlayer then
+            aimAtTarget(targetPlayer)
+        end
     end
 end)
 
