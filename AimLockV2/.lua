@@ -2,65 +2,80 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
 
 -- Настройки
-local AimLockKey = Enum.KeyCode.F -- Клавиша для включения aim lock
-local AimSensitivity = 1 -- Скорость наведения на цель
-local AimLockDuration = 0.01 -- Продолжительность мгновенной наводки (в секундах)
-local ToggleTableKey = Enum.KeyCode.M -- Клавиша для переключения видимости обеих таблиц
-local ResetTargetsKey = Enum.KeyCode.N -- Клавиша для сброса всех выбранных целей
-local ToggleAimModeKey = Enum.KeyCode.K -- Клавиша для переключения между режимами наводки
+local AimLockKey = Enum.KeyCode.F
+local AimSensitivity = 1
+local AimLockDuration = 0.01
+local ToggleTableKey = Enum.KeyCode.M
+local ResetTargetsKey = Enum.KeyCode.N
+local ToggleAimModeKey = Enum.KeyCode.K
 
-local aimLockEnabled = false -- Флаг для мгновенной наводки
-local isContinuousAimEnabled = false -- Флаг для постепенной наводки
-local selectedPlayers = {} -- Список выбранных игроков
+local aimLockEnabled = false
+local isContinuousAimEnabled = false
+local selectedPlayers = {}
 local targetPlayer = nil
-local isInContinuousMode = false -- Флаг для режима "постепенной наводки"
+local isInContinuousMode = false
 
 -- Создаем GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 screenGui.Name = "AimLockGUI"
+screenGui.ResetOnSpawn = false -- Чтобы GUI не исчезал после смерти
 
 -- Основная таблица игроков
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 300) -- Увеличиваем размер таблицы
+frame.Size = UDim2.new(0, 300, 0, 250)
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.5
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 frame.Parent = screenGui
+
+-- ScrollingFrame для прокрутки
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1, 0, 1, 0)
+scrollingFrame.BackgroundTransparency = 1
+scrollingFrame.BorderSizePixel = 0
+scrollingFrame.ScrollBarThickness = 10
+scrollingFrame.Parent = frame
 
 local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.Padding = UDim.new(0, 5)
 uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.Parent = frame
+uiListLayout.Parent = scrollingFrame
 
-local playerButtons = {} -- Храним кнопки для игроков
+local playerButtons = {}
 
 -- Функция для создания кнопки для игрока
 local function createPlayerButton(player)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 30)
-    button.Text = player.Name
+    button.Size = UDim2.new(1, 0, 0, 40) -- Увеличен размер текста
+    button.Text = player.Name .. "\n(" .. player.DisplayName .. ")"
+    button.TextSize = 18 -- Увеличен размер шрифта
+    button.TextWrapped = true
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextSize = 14
-    button.Parent = frame
+    button.Font = Enum.Font.GothamBold
+    button.BorderSizePixel = 1
+    button.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    button.Parent = scrollingFrame
 
-    -- Обработка выбора игрока
     button.MouseButton1Click:Connect(function()
         if selectedPlayers[player] then
             selectedPlayers[player] = nil
-            button.BackgroundColor3 = Color3.fromRGB(50, 50, 50) -- Обычный цвет
+            button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         else
             selectedPlayers[player] = true
-            button.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Зеленый цвет для выбранных
+            button.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
         end
     end)
 
     return button
 end
 
--- Функция для отображения всех игроков на сервере в GUI
 local function updatePlayerList()
     for _, button in pairs(playerButtons) do
         button:Destroy()
@@ -73,72 +88,35 @@ local function updatePlayerList()
             table.insert(playerButtons, button)
         end
     end
+
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #playerButtons * 45)
 end
 
--- Функция для получения ближайшей цели
-local function getClosestTarget()
-    local closestDistance = math.huge
-    local closestPlayer = nil
-
-    for player, _ in pairs(selectedPlayers) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local middlePart = player.Character.HumanoidRootPart
-            local targetPosition = middlePart.Position
-            local distance = (LocalPlayer.Character.HumanoidRootPart.Position - targetPosition).Magnitude
-
-            if distance < closestDistance then
-                closestDistance = distance
-                closestPlayer = player
-            end
-        end
-    end
-
-    return closestPlayer
-end
-
--- Функция для наведения на цель
-local function aimAtTarget(target)
-    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-
-    local middlePart = target.Character.HumanoidRootPart
-    local targetPosition = middlePart.Position
-    -- Интерполяция для плавного наведения
-    local currentCameraCFrame = Camera.CFrame
-    local direction = (targetPosition - currentCameraCFrame.Position).Unit
-    local newCFrame = CFrame.new(currentCameraCFrame.Position, currentCameraCFrame.Position + direction)
-
-    Camera.CFrame = currentCameraCFrame:Lerp(newCFrame, AimSensitivity)
-end
-
--- Создаем маленькую таблицу с инструкцией справа от списка игроков
+-- Инструкция
 local instructionFrame = Instance.new("Frame")
-instructionFrame.Size = UDim2.new(0, 250, 0, 300) -- Увеличиваем размер таблицы, чтобы поместилась вся инструкция
-instructionFrame.Position = UDim2.new(0, 320, 0, 10) -- Пододвигаем вправо
-instructionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-instructionFrame.Visible = true -- Сделаем видимой с самого начала
+instructionFrame.Size = UDim2.new(0, 250, 0, 300)
+instructionFrame.Position = UDim2.new(0, 320, 0, 10)
+instructionFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+instructionFrame.BackgroundTransparency = 0.5
+instructionFrame.BorderSizePixel = 2
+instructionFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+instructionFrame.Visible = true
 instructionFrame.Parent = screenGui
 
 local instructionLabel = Instance.new("TextLabel")
-instructionLabel.Size = UDim2.new(1, 0, 0, 250) -- Увеличиваем размер для инструкции
+instructionLabel.Size = UDim2.new(1, 0, 0, 250)
 instructionLabel.Position = UDim2.new(0, 0, 0, 0)
-instructionLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+instructionLabel.BackgroundTransparency = 1
 instructionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 instructionLabel.TextSize = 14
-instructionLabel.Text = "Инструкция:\n" ..
-                        "F - Вкл/выкл аим лока (наводка на 0.01 сек)\n" ..
-                        "K - Переключить режим аим лока (постепенная или на 0.1)\n" ..
-                        "M - Скрыть или Показать обе таблицы\n" ..
-                        "N - Сбросить все выбранные цели и очистить подсветку"
+instructionLabel.Text = "Инструкция:\nF - Вкл/выкл аим лока (на 0.01 сек)\nK - Переключить режим аим лока\nM - Скрыть/показать таблицы\nN - Сбросить цели"
 instructionLabel.TextWrapped = true
 instructionLabel.TextYAlignment = Enum.TextYAlignment.Top
 instructionLabel.Parent = instructionFrame
 
--- Подпись "создано игроком Nano"
 local authorLabel = Instance.new("TextLabel")
 authorLabel.Size = UDim2.new(1, 0, 0, 30)
-authorLabel.Position = UDim2.new(0, 0, 0.85, 0) -- Смещаем немного вниз
+authorLabel.Position = UDim2.new(0, 0, 0.85, 0)
 authorLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 authorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 authorLabel.TextSize = 12
@@ -151,75 +129,13 @@ authorLabel.Parent = instructionFrame
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
-    -- Переключение видимости обеих таблиц
     if input.KeyCode == ToggleTableKey then
         frame.Visible = not frame.Visible
         instructionFrame.Visible = not instructionFrame.Visible
     end
-
-    -- Включение aim lock при нажатии на F
-    if input.KeyCode == AimLockKey then
-        if isInContinuousMode then
-            -- Для постепенной наводки
-            aimLockEnabled = not aimLockEnabled
-        else
-            -- Для мгновенной наводки
-            aimLockEnabled = true
-            targetPlayer = getClosestTarget()
-
-            -- Если цель найдена, наводим на неё
-            if targetPlayer then
-                aimAtTarget(targetPlayer)
-
-                -- Останавливаем aim lock через 0.01 секунды
-                wait(AimLockDuration)
-
-                -- Отключаем aim lock после задержки
-                aimLockEnabled = false
-                targetPlayer = nil
-            end
-        end
-    end
-
-    -- Переключение между режимами aim lock при нажатии на K
-    if input.KeyCode == ToggleAimModeKey then
-        isInContinuousMode = not isInContinuousMode
-        -- Отключаем aim lock при переключении
-        aimLockEnabled = false
-        targetPlayer = nil
-    end
-
-    -- Сброс всех выбранных игроков при нажатии на N
-    if input.KeyCode == ResetTargetsKey then
-        selectedPlayers = {} -- Очищаем список выбранных игроков
-        aimLockEnabled = false -- Отключаем aim lock
-        targetPlayer = nil -- Очищаем текущую цель
-        -- Обновляем GUI, сбрасывая подсветку кнопок
-        updatePlayerList()
-    end
 end)
 
--- Цикл для обновления aim lock
-game:GetService("RunService").RenderStepped:Connect(function()
-    if aimLockEnabled then
-        if not targetPlayer or not targetPlayer.Character then
-            targetPlayer = getClosestTarget()
-        end
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
 
-        if targetPlayer then
-            aimAtTarget(targetPlayer)
-        end
-    end
-end)
-
--- Инициализация списка игроков
-Players.PlayerAdded:Connect(function(player)
-    updatePlayerList()
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    updatePlayerList()
-end)
-
--- Изначально отображаем список игроков
 updatePlayerList()
