@@ -12,10 +12,21 @@ local ToggleTableKey = Enum.KeyCode.M -- Клавиша для переключ�
 local ResetTargetsKey = Enum.KeyCode.N -- Клавиша для сброса всех целей
 local ToggleAimModeKey = Enum.KeyCode.K -- Клавиша для переключения режима наводки
 
+local AimDetectionThreshold = 3 -- Порог точности прицеливания (в градусах)
+local AimHoldDuration = 0.3 -- Минимальная продолжительность удержания прицела для фиксации Aim Lock (в секундах)
+local StabilityFrameCount = 20 -- Количество кадров для проверки стабильности
+local suddenTurnThreshold = 80 -- Порог резкого поворота в градусах
+local aimLockHoldThreshold = 2 -- Порог времени удержания прицела на цели (в секундах)
+
 local aimLockEnabled = false
 local isInContinuousMode = false
 local selectedPlayers = {}
 local targetPlayer = nil
+local detectedAimLockUsers = {} -- Список игроков, уличенных в Aim Lock (не убираются)
+local aimTrackingData = {} -- Данные по игрокам
+local aimHoldTime = {} -- Время начала прицеливания
+local aimStability = {} -- Стабильность прицеливания
+local lastCameraDirection = {} -- Последнее направление взгляда
 
 -- Создаем GUI
 local screenGui = Instance.new("ScreenGui")
@@ -100,6 +111,18 @@ local function createPlayerButton(player)
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 10)
     buttonCorner.Parent = button
+
+    local lockLabel = Instance.new("TextLabel")
+    lockLabel.Size = UDim2.new(0, 50, 1, 0)
+    lockLabel.Position = UDim2.new(1, -50, 0, 0)
+    lockLabel.BackgroundTransparency = 1
+    lockLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    lockLabel.TextSize = 12 -- Уменьшили шрифт до 12
+    lockLabel.Text = "LOCK"
+    lockLabel.Visible = detectedAimLockUsers[player] or false
+    lockLabel.Parent = button
+
+    aimTrackingData[player] = { button = button, lockLabel = lockLabel }
 
     button.MouseButton1Click:Connect(function()
         if selectedPlayers[player] then
@@ -276,3 +299,53 @@ LocalPlayer.CharacterAdded:Connect(function(character)
     aimLockEnabled = false
     targetPlayer = nil
 end)
+
+local function trackAimingBehavior()
+    RunService.RenderStepped:Connect(function()
+        if not aimLockEnabled or not targetPlayer or not targetPlayer.Character then
+            return
+        end
+
+        local cameraDirection = Camera.CFrame.LookVector
+        local rootPart = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+
+        -- Проверяем резкие повороты камеры
+        if lastCameraDirection[targetPlayer] then
+            local angleDiff = math.deg(math.acos(lastCameraDirection[targetPlayer]:Dot(cameraDirection)))
+            if angleDiff > 80 then -- Увеличили порог резкого поворота
+                detectedAimLockUsers[targetPlayer] = true
+            end
+        end
+        lastCameraDirection[targetPlayer] = cameraDirection
+
+        -- Проверяем, насколько долго прицел зафиксирован на цели
+        local targetPos = rootPart.Position
+        local directionToTarget = (targetPos - Camera.CFrame.Position).Unit
+        local angleToTarget = math.deg(math.acos(cameraDirection:Dot(directionToTarget)))
+
+        if angleToTarget <= 3 then -- Разрешаем небольшие отклонения
+            if not aimHoldTime[targetPlayer] then
+                aimHoldTime[targetPlayer] = tick()
+                aimStability[targetPlayer] = 0
+            else
+                aimStability[targetPlayer] = aimStability[targetPlayer] + 1
+                if tick() - aimHoldTime[targetPlayer] >= AimHoldDuration and aimStability[targetPlayer] >= StabilityFrameCount then
+                    if tick() - aimHoldTime[targetPlayer] >= aimLockHoldThreshold and (tick() - aimHoldTime[targetPlayer]) > 0.6 then
+                        detectedAimLockUsers[targetPlayer] = true
+                    end
+                end
+            end
+        else
+            aimHoldTime[targetPlayer] = nil
+            aimStability[targetPlayer] = 0
+        end
+
+        -- Обновляем отображение "LOCK"
+        if detectedAimLockUsers[targetPlayer] and aimTrackingData[targetPlayer] then
+            aimTrackingData[targetPlayer].lockLabel.Visible = true
+        end
+    end)
+end
+
+trackAimingBehavior()
