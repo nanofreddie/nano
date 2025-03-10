@@ -50,22 +50,28 @@ end
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 300, 0, 250)
 frame.Position = UDim2.new(0, 10, 0, 10)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BackgroundTransparency = 0.5
-frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.fromRGB(255, 255, 255)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Основной цвет черный
+frame.BackgroundTransparency = 0.5 -- Делаем таблицу прозрачной
+frame.BorderSizePixel = 0 -- Отключаем стандартную обводку
 frame.Parent = screenGui
+
+-- Добавляем белую обводку с округленными краями
+local frameOutline = Instance.new("Frame")
+frameOutline.Size = UDim2.new(1, 4, 1, 4)
+frameOutline.Position = UDim2.new(0, -2, 0, -2)
+frameOutline.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+frameOutline.BorderSizePixel = 0
+frameOutline.ZIndex = -1
+
+local frameOutlineCorner = Instance.new("UICorner")
+frameOutlineCorner.CornerRadius = UDim.new(0, 10)
+frameOutlineCorner.Parent = frameOutline
+
+frameOutline.Parent = frame
 
 local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 10)
 uiCorner.Parent = frame
-
-local uiGradient = Instance.new("UIGradient")
-uiGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 128, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 128))
-}
-uiGradient.Parent = frame
 
 makeDraggable(frame)
 
@@ -158,22 +164,28 @@ end
 local instructionFrame = Instance.new("Frame")
 instructionFrame.Size = UDim2.new(0, 250, 0, 150)
 instructionFrame.Position = UDim2.new(0, 320, 0, 10)
-instructionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-instructionFrame.BackgroundTransparency = 0.5
-instructionFrame.BorderSizePixel = 2
-instructionFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
+instructionFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Основной цвет черный
+instructionFrame.BackgroundTransparency = 0.5 -- Делаем таблицу прозрачной
+instructionFrame.BorderSizePixel = 0 -- Отключаем стандартную обводку
 instructionFrame.Parent = screenGui
+
+-- Добавляем белую обводку с округленными краями
+local instructionFrameOutline = Instance.new("Frame")
+instructionFrameOutline.Size = UDim2.new(1, 4, 1, 4)
+instructionFrameOutline.Position = UDim2.new(0, -2, 0, -2)
+instructionFrameOutline.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+instructionFrameOutline.BorderSizePixel = 0
+instructionFrameOutline.ZIndex = -1
+
+local instructionFrameOutlineCorner = Instance.new("UICorner")
+instructionFrameOutlineCorner.CornerRadius = UDim.new(0, 10)
+instructionFrameOutlineCorner.Parent = instructionFrameOutline
+
+instructionFrameOutline.Parent = instructionFrame
 
 local uiCornerInstruction = Instance.new("UICorner")
 uiCornerInstruction.CornerRadius = UDim.new(0, 10)
 uiCornerInstruction.Parent = instructionFrame
-
-local uiGradientInstruction = Instance.new("UIGradient")
-uiGradientInstruction.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 128, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 128))
-}
-uiGradientInstruction.Parent = instructionFrame
 
 makeDraggable(instructionFrame)
 
@@ -258,3 +270,9 @@ end)
 Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 updatePlayerList()
+
+-- Сброс aimLockEnabled при смерти игрока
+LocalPlayer.CharacterAdded:Connect(function(character)
+    aimLockEnabled = false
+    targetPlayer = nil
+end)
