@@ -12,11 +12,11 @@ local ToggleTableKey = Enum.KeyCode.M -- Клавиша для переключ�
 local ResetTargetsKey = Enum.KeyCode.N -- Клавиша для сброса всех целей
 local ToggleAimModeKey = Enum.KeyCode.K -- Клавиша для переключения режима наводки
 
-local AimDetectionThreshold = 3 -- Порог точности прицеливания (в градусах)
-local AimHoldDuration = 0.3 -- Минимальная продолжительность удержания прицела для фиксации Aim Lock (в секундах)
-local StabilityFrameCount = 20 -- Количество кадров для проверки стабильности
-local suddenTurnThreshold = 80 -- Порог резкого поворота в градусах
-local aimLockHoldThreshold = 0.5 -- Порог времени удержания прицела на цели (в секундах)
+local AimDetectionThreshold = 6 -- Порог точности прицеливания (в градусах)
+local AimHoldDuration = 0.7 -- Минимальная продолжительность удержания прицела для фиксации Aim Lock (в секундах)
+local StabilityFrameCount = 50 -- Количество кадров для проверки стабильности
+local suddenTurnThreshold = 120 -- Порог резкого поворота в градусах
+local aimLockHoldThreshold = 0.6 -- Порог времени удержания прицела на цели (в секундах)
 
 local aimLockEnabled = false
 local isInContinuousMode = false
@@ -27,6 +27,7 @@ local aimTrackingData = {} -- Данные по игрокам
 local aimHoldTime = {} -- Время начала прицеливания
 local aimStability = {} -- Стабильность прицеливания
 local lastCameraDirection = {} -- Последнее направление взгляда
+local suddenTurnCount = {} -- Счетчик резких поворотов
 
 -- Создаем GUI
 local screenGui = Instance.new("ScreenGui")
@@ -114,7 +115,7 @@ local function createPlayerButton(player)
 
     local lockLabel = Instance.new("TextLabel")
     lockLabel.Size = UDim2.new(0, 50, 1, 0)
-    lockLabel.Position = UDim2.new(1, -50, 0, 0)
+    lockLabel.Position = UDim2.new(1, -60, 0, 0)  -- Сдвигаем влево
     lockLabel.BackgroundTransparency = 1
     lockLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
     lockLabel.TextSize = 10 -- Уменьшили шрифт до 10
@@ -255,13 +256,13 @@ menuButton.Text = "Обязательно прочитать! ▼"
 menuButton.Parent = instructionFrame
 
 local menuFrame = Instance.new("Frame")
-menuFrame.Size = UDim2.new(0, 250, 0, 100)
+menuFrame.Size = UDim2.new(0, 250, 0, 200) -- Увеличили высоту для полного отображения текста
 menuFrame.Position = UDim2.new(0, 0, 1, 10)
 menuFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 menuFrame.BackgroundTransparency = 0.5
 menuFrame.BorderSizePixel = 0
 menuFrame.Visible = false
-menuFrame.Parent = screenGui
+menuFrame.Parent = instructionFrame -- Изменено для синхронизации с инструкцией
 
 local menuFrameOutline = Instance.new("Frame")
 menuFrameOutline.Size = UDim2.new(1, 4, 1, 4)
@@ -289,7 +290,7 @@ menuLabel.Font = Enum.Font.GothamBold
 menuLabel.Text = "В списке с игроками справа будет появляться надпись - \"LOCK\"\n" ..
                  "если мой скрипт обнаружил, что человек играет с локом.\n" ..
                  "Мой скрипт может работать некорректно, поэтому извините,\n" ..
-                 "если он не нашел локера или пометил случайного человека как локера."
+                 "если он не нашел локера или пометил случайного человека как локера, или не правильно выявил. Скрипт еще в разработке, извините за неудобства."
 menuLabel.TextWrapped = true
 menuLabel.Parent = menuFrame
 
@@ -297,7 +298,6 @@ menuButton.MouseButton1Click:Connect(function()
     menuFrame.Visible = not menuFrame.Visible
     if menuFrame.Visible then
         menuButton.Text = "Обязательно прочитать! ▲"
-        menuFrame.Position = UDim2.new(0, menuButton.AbsolutePosition.X, 0, menuButton.AbsolutePosition.Y + menuButton.AbsoluteSize.Y)
     else
         menuButton.Text = "Обязательно прочитать! ▼"
     end
@@ -366,48 +366,56 @@ end)
 
 local function trackAimingBehavior()
     RunService.RenderStepped:Connect(function()
-        if not aimLockEnabled or not targetPlayer or not targetPlayer.Character then
-            return
-        end
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                for _, otherPlayer in pairs(Players:GetPlayers()) do
+                    if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        local cameraDirection = player.Character.HumanoidRootPart.CFrame.LookVector
+                        local rootPart = otherPlayer.Character.HumanoidRootPart
 
-        local cameraDirection = Camera.CFrame.LookVector
-        local rootPart = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
+                        -- Проверяем резкие повороты камеры
+                        if lastCameraDirection[player] then
+                            local angleDiff = math.deg(math.acos(lastCameraDirection[player]:Dot(cameraDirection)))
+                            if angleDiff > suddenTurnThreshold then -- Увеличили порог резкого поворота
+                                suddenTurnCount[player] = (suddenTurnCount[player] or 0) + 1
+                                if suddenTurnCount[player] >= 3 then -- Проверка множественных поворотов за короткое время
+                                    detectedAimLockUsers[player] = true
+                                end
+                            else
+                                suddenTurnCount[player] = 0
+                            end
+                        end
+                        lastCameraDirection[player] = cameraDirection
 
-        -- Проверяем резкие повороты камеры
-        if lastCameraDirection[targetPlayer] then
-            local angleDiff = math.deg(math.acos(lastCameraDirection[targetPlayer]:Dot(cameraDirection)))
-            if angleDiff > 80 then -- Увеличили порог резкого поворота
-                detectedAimLockUsers[targetPlayer] = true
-            end
-        end
-        lastCameraDirection[targetPlayer] = cameraDirection
+                        -- Проверяем, насколько долго прицел зафиксирован на цели
+                        local targetPos = rootPart.Position
+                        local directionToTarget = (targetPos - player.Character.HumanoidRootPart.Position).Unit
+                        local angleToTarget = math.deg(math.acos(cameraDirection:Dot(directionToTarget)))
 
-        -- Проверяем, насколько долго прицел зафиксирован на цели
-        local targetPos = rootPart.Position
-        local directionToTarget = (targetPos - Camera.CFrame.Position).Unit
-        local angleToTarget = math.deg(math.acos(cameraDirection:Dot(directionToTarget)))
+                        if angleToTarget <= AimDetectionThreshold then -- Разрешаем небольшие отклонения
+                            if not aimHoldTime[player] then
+                                aimHoldTime[player] = tick()
+                                aimStability[player] = 0
+                            else
+                                aimStability[player] = aimStability[player] + 1
+                                if tick() - aimHoldTime[player] >= AimHoldDuration and aimStability[player] >= StabilityFrameCount then
+                                    if tick() - aimHoldTime[player] >= aimLockHoldThreshold and (tick() - aimHoldTime[player]) > 0.6 then
+                                        detectedAimLockUsers[player] = true
+                                    end
+                                end
+                            end
+                        else
+                            aimHoldTime[player] = nil
+                            aimStability[player] = 0
+                        end
 
-        if angleToTarget <= 3 then -- Разрешаем небольшие отклонения
-            if not aimHoldTime[targetPlayer] then
-                aimHoldTime[targetPlayer] = tick()
-                aimStability[targetPlayer] = 0
-            else
-                aimStability[targetPlayer] = aimStability[targetPlayer] + 1
-                if tick() - aimHoldTime[targetPlayer] >= AimHoldDuration and aimStability[targetPlayer] >= StabilityFrameCount then
-                    if tick() - aimHoldTime[targetPlayer] >= aimLockHoldThreshold and (tick() - aimHoldTime[targetPlayer]) > 0.6 then
-                        detectedAimLockUsers[targetPlayer] = true
+                        -- Обновляем отображение "LOCK"
+                        if detectedAimLockUsers[player] and aimTrackingData[player] then
+                            aimTrackingData[player].lockLabel.Visible = true
+                        end
                     end
                 end
             end
-        else
-            aimHoldTime[targetPlayer] = nil
-            aimStability[targetPlayer] = 0
-        end
-
-        -- Обновляем отображение "LOCK"
-        if detectedAimLockUsers[targetPlayer] and aimTrackingData[targetPlayer] then
-            aimTrackingData[targetPlayer].lockLabel.Visible = true
         end
     end)
 end
