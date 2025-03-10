@@ -53,7 +53,19 @@ frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BackgroundTransparency = 0.5
 frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.fromRGB(255, 255, 255)
 frame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 10)
+uiCorner.Parent = frame
+
+local uiGradient = Instance.new("UIGradient")
+uiGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 128, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 128))
+}
+uiGradient.Parent = frame
 
 makeDraggable(frame)
 
@@ -75,7 +87,13 @@ local function createPlayerButton(player)
     button.Text = player.Name .. "\n(" .. player.DisplayName .. ")"
     button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 16
     button.Parent = scrollingFrame
+
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 10)
+    buttonCorner.Parent = button
 
     button.MouseButton1Click:Connect(function()
         if selectedPlayers[player] then
@@ -84,6 +102,7 @@ local function createPlayerButton(player)
         else
             selectedPlayers[player] = true
             button.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+            button.BackgroundTransparency = 0.5
         end
     end)
 
@@ -137,20 +156,33 @@ end
 
 -- Окно с инструкцией
 local instructionFrame = Instance.new("Frame")
-instructionFrame.Size = UDim2.new(0, 250, 0, 300)
+instructionFrame.Size = UDim2.new(0, 250, 0, 150)
 instructionFrame.Position = UDim2.new(0, 320, 0, 10)
-instructionFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+instructionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 instructionFrame.BackgroundTransparency = 0.5
 instructionFrame.BorderSizePixel = 2
+instructionFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
 instructionFrame.Parent = screenGui
+
+local uiCornerInstruction = Instance.new("UICorner")
+uiCornerInstruction.CornerRadius = UDim.new(0, 10)
+uiCornerInstruction.Parent = instructionFrame
+
+local uiGradientInstruction = Instance.new("UIGradient")
+uiGradientInstruction.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 128, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 128))
+}
+uiGradientInstruction.Parent = instructionFrame
 
 makeDraggable(instructionFrame)
 
 local instructionLabel = Instance.new("TextLabel")
-instructionLabel.Size = UDim2.new(1, 0, 0, 250)
+instructionLabel.Size = UDim2.new(1, 0, 0, 120)
 instructionLabel.BackgroundTransparency = 1
 instructionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 instructionLabel.TextSize = 14
+instructionLabel.Font = Enum.Font.GothamBold
 instructionLabel.Text = "Инструкция:\n" ..
                         "F - Вкл/выкл аим лока\n" ..
                         "K - Переключить режим аим лока\n" ..
@@ -161,13 +193,18 @@ instructionLabel.Parent = instructionFrame
 
 local authorLabel = Instance.new("TextLabel")
 authorLabel.Size = UDim2.new(1, 0, 0, 30)
-authorLabel.Position = UDim2.new(0, 0, 0.85, 0)
+authorLabel.Position = UDim2.new(0, 0, 0.8, 0)
 authorLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 authorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 authorLabel.TextSize = 12
+authorLabel.Font = Enum.Font.GothamBold
 authorLabel.Text = "Создано игроком Nano"
 authorLabel.TextWrapped = true
 authorLabel.Parent = instructionFrame
+
+local authorCorner = Instance.new("UICorner")
+authorCorner.CornerRadius = UDim.new(0, 10)
+authorCorner.Parent = authorLabel
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
