@@ -16,7 +16,7 @@ local AimDetectionThreshold = 3 -- Порог точности прицелив�
 local AimHoldDuration = 0.3 -- Минимальная продолжительность удержания прицела для фиксации Aim Lock (в секундах)
 local StabilityFrameCount = 20 -- Количество кадров для проверки стабильности
 local suddenTurnThreshold = 80 -- Порог резкого поворота в градусах
-local aimLockHoldThreshold = 2 -- Порог времени удержания прицела на цели (в секундах)
+local aimLockHoldThreshold = 0.5 -- Порог времени удержания прицела на цели (в секундах)
 
 local aimLockEnabled = false
 local isInContinuousMode = false
@@ -117,7 +117,7 @@ local function createPlayerButton(player)
     lockLabel.Position = UDim2.new(1, -50, 0, 0)
     lockLabel.BackgroundTransparency = 1
     lockLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-    lockLabel.TextSize = 12 -- Уменьшили шрифт до 12
+    lockLabel.TextSize = 10 -- Уменьшили шрифт до 10
     lockLabel.Text = "LOCK"
     lockLabel.Visible = detectedAimLockUsers[player] or false
     lockLabel.Parent = button
@@ -241,12 +241,76 @@ local authorCorner = Instance.new("UICorner")
 authorCorner.CornerRadius = UDim.new(0, 10)
 authorCorner.Parent = authorLabel
 
+-- Меню под инструкцией
+local menuButton = Instance.new("TextButton")
+menuButton.Size = UDim2.new(1, 0, 0, 30)
+menuButton.Position = UDim2.new(0, 0, 1, 10)
+menuButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+menuButton.BackgroundTransparency = 0.5
+menuButton.BorderSizePixel = 0
+menuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+menuButton.TextSize = 14
+menuButton.Font = Enum.Font.GothamBold
+menuButton.Text = "Обязательно прочитать! ▼"
+menuButton.Parent = instructionFrame
+
+local menuFrame = Instance.new("Frame")
+menuFrame.Size = UDim2.new(0, 250, 0, 100)
+menuFrame.Position = UDim2.new(0, 0, 1, 10)
+menuFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+menuFrame.BackgroundTransparency = 0.5
+menuFrame.BorderSizePixel = 0
+menuFrame.Visible = false
+menuFrame.Parent = screenGui
+
+local menuFrameOutline = Instance.new("Frame")
+menuFrameOutline.Size = UDim2.new(1, 4, 1, 4)
+menuFrameOutline.Position = UDim2.new(0, -2, 0, -2)
+menuFrameOutline.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+menuFrameOutline.BorderSizePixel = 0
+menuFrameOutline.ZIndex = -1
+
+local menuFrameOutlineCorner = Instance.new("UICorner")
+menuFrameOutlineCorner.CornerRadius = UDim.new(0, 10)
+menuFrameOutlineCorner.Parent = menuFrameOutline
+
+menuFrameOutline.Parent = menuFrame
+
+local uiCornerMenu = Instance.new("UICorner")
+uiCornerMenu.CornerRadius = UDim.new(0, 10)
+uiCornerMenu.Parent = menuFrame
+
+local menuLabel = Instance.new("TextLabel")
+menuLabel.Size = UDim2.new(1, 0, 1, 0)
+menuLabel.BackgroundTransparency = 1
+menuLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+menuLabel.TextSize = 14
+menuLabel.Font = Enum.Font.GothamBold
+menuLabel.Text = "В списке с игроками справа будет появляться надпись - \"LOCK\"\n" ..
+                 "если мой скрипт обнаружил, что человек играет с локом.\n" ..
+                 "Мой скрипт может работать некорректно, поэтому извините,\n" ..
+                 "если он не нашел локера или пометил случайного человека как локера."
+menuLabel.TextWrapped = true
+menuLabel.Parent = menuFrame
+
+menuButton.MouseButton1Click:Connect(function()
+    menuFrame.Visible = not menuFrame.Visible
+    if menuFrame.Visible then
+        menuButton.Text = "Обязательно прочитать! ▲"
+        menuFrame.Position = UDim2.new(0, menuButton.AbsolutePosition.X, 0, menuButton.AbsolutePosition.Y + menuButton.AbsoluteSize.Y)
+    else
+        menuButton.Text = "Обязательно прочитать! ▼"
+    end
+end)
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
     if input.KeyCode == ToggleTableKey then
         frame.Visible = not frame.Visible
         instructionFrame.Visible = not instructionFrame.Visible
+        menuFrame.Visible = false
+        menuButton.Text = "Обязательно прочитать! ▼"
     end
 
     if input.KeyCode == AimLockKey then
