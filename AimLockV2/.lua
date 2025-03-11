@@ -258,7 +258,7 @@ menuButton.Parent = instructionFrame
 
 local menuFrame = Instance.new("Frame")
 menuFrame.Size = UDim2.new(1, 0, 0, 200)
-menuFrame.Position = UDim2.new(0, 0, 1, 10)
+menuFrame.Position = UDim2.new(0, 0, 1, 0)
 menuFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 menuFrame.BackgroundTransparency = 0.5
 menuFrame.BorderSizePixel = 0
@@ -299,10 +299,8 @@ menuButton.MouseButton1Click:Connect(function()
     menuFrame.Visible = not menuFrame.Visible
     if menuFrame.Visible then
         menuButton.Text = "Обязательно прочитать! ▲"
-        instructionFrame.Size = UDim2.new(0, 250, 0, 350)
     else
         menuButton.Text = "Обязательно прочитать! ▼"
-        instructionFrame.Size = UDim2.new(0, 250, 0, 150)
     end
 end)
 
@@ -314,7 +312,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         instructionFrame.Visible = not instructionFrame.Visible
         menuFrame.Visible = false
         menuButton.Text = "Обязательно прочитать! ▼"
-        instructionFrame.Size = UDim2.new(0, 250, 0, 150)
     end
 
     if input.KeyCode == AimLockKey then
@@ -410,15 +407,6 @@ local function trackAimingBehavior()
                                 if detectedAimLockUsers[player] and aimTrackingData[player] then
                                     aimTrackingData[player].lockLabel.Visible = true
                                 end
-
-                                -- Проверка резких движений камеры
-                                if lastCameraDirection[player] then
-                                    local angleChange = math.acos(lastCameraDirection[player]:Dot(cameraDirection))
-                                    if angleChange > math.rad(30) then
-                                        detectedAimLockUsers[player] = true
-                                    end
-                                end
-                                lastCameraDirection[player] = cameraDirection
                             end
                         end
                     end
